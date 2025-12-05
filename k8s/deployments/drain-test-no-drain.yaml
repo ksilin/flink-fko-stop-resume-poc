@@ -1,0 +1,84 @@
+apiVersion: flink.apache.org/v1beta1
+kind: FlinkDeployment
+metadata:
+  name: drain-test-no-drain
+  namespace: flink
+spec:
+  image: flink-deployment-test:latest
+  imagePullPolicy: Never
+  flinkVersion: v1_20
+  flinkConfiguration:
+    taskmanager.numberOfTaskSlots: "1"
+    state.backend: hashmap
+    state.savepoints.dir: file:///opt/flink/savepoints
+    state.checkpoints.dir: file:///opt/flink/checkpoints
+    execution.checkpointing.interval: "10000"
+    # DRAIN DISABLED (explicit) - This is the default behavior
+    # When set to false, the operator should NOT drain the job before taking savepoint
+    # Window state should be preserved
+    kubernetes.operator.job.drain-on-savepoint-deletion: "false"
+  serviceAccount: flink
+  podTemplate:
+    spec:
+      containers:
+        - name: flink-main-container
+          volumeMounts:
+            - name: savepoints-volume
+              mountPath: /opt/flink/savepoints
+            - name: checkpoints-volume
+              mountPath: /opt/flink/checkpoints
+      volumes:
+        - name: savepoints-volume
+          persistentVolumeClaim:
+            claimName: flink-savepoints-test
+        - name: checkpoints-volume
+          emptyDir: {}
+  jobManager:
+    resource:
+      memory: "1024m"
+      cpu: 0.5
+    podTemplate:
+      spec:
+        containers:
+          - name: flink-main-container
+            volumeMounts:
+              - name: savepoints-volume
+                mountPath: /opt/flink/savepoints
+              - name: checkpoints-volume
+                mountPath: /opt/flink/checkpoints
+        volumes:
+          - name: savepoints-volume
+            persistentVolumeClaim:
+              claimName: flink-savepoints-test
+          - name: checkpoints-volume
+            emptyDir: {}
+  taskManager:
+    resource:
+      memory: "1024m"
+      cpu: 0.5
+    podTemplate:
+      spec:
+        containers:
+          - name: flink-main-container
+            volumeMounts:
+              - name: savepoints-volume
+                mountPath: /opt/flink/savepoints
+              - name: checkpoints-volume
+                mountPath: /opt/flink/checkpoints
+        volumes:
+          - name: savepoints-volume
+            persistentVolumeClaim:
+              claimName: flink-savepoints-test
+          - name: checkpoints-volume
+            emptyDir: {}
+  job:
+    jarURI: local:///opt/flink/usrlib/flink-deployment-test-1.0-SNAPSHOT.jar
+    entryClass: com.example.flink.WindowedDrainTestJob
+    args:
+      - "--window-size=30"
+      - "--watermarks=true"
+      - "--rate=2"
+      - "--keys=5"
+    parallelism: 1
+    upgradeMode: savepoint
+    state: running

@@ -1,0 +1,31 @@
+apiVersion: flink.apache.org/v1beta1
+kind: FlinkDeployment
+metadata:
+  name: kafka-stateless-job
+  namespace: flink
+spec:
+  image: flink-deployment-test:latest
+  imagePullPolicy: Never
+  flinkVersion: v1_20
+  flinkConfiguration:
+    taskmanager.numberOfTaskSlots: "2"
+  serviceAccount: flink
+  jobManager:
+    resource:
+      memory: "1024m"
+      cpu: 1
+  taskManager:
+    resource:
+      memory: "1024m"
+      cpu: 1
+  job:
+    jarURI: local:///opt/flink/usrlib/flink-deployment-test-1.0-SNAPSHOT.jar
+    entryClass: com.example.flink.KafkaStatelessJob
+    args:
+      - "--kafka-bootstrap=kafka.flink.svc.cluster.local:9092"
+      - "--input-topic=test-input"
+      - "--output-topic=test-output"
+      - "--consumer-group=kafka-stateless-job"
+    parallelism: 2
+    upgradeMode: stateless
+    state: running

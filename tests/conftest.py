@@ -73,6 +73,9 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "slow: Slow test (> 1 minute)"
     )
+    config.addinivalue_line(
+        "markers", "draining: Tests for Flink drain behavior on savepoint"
+    )
 
     # Check for required environment variables in integration tests
     if config.getoption("markexpr") != "not integration":

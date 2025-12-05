@@ -150,3 +150,62 @@ class KubernetesClient:
 
         logger.error(f"FlinkDeployment {name} did not reach state {expected_state} after {timeout}s")
         return False
+
+    def get_pod_logs_by_label(self, label_selector: str, tail_lines: int = 1000) -> str:
+        """
+        Get logs from pods matching a label selector.
+
+        Args:
+            label_selector: Kubernetes label selector (e.g., "app=my-app,component=taskmanager")
+            tail_lines: Number of lines to retrieve from each pod
+
+        Returns:
+            Combined logs from all matching pods
+        """
+        pods = self.list_pods(label_selector=label_selector)
+        if not pods:
+            logger.warning(f"No pods found matching selector: {label_selector}")
+            return ""
+
+        all_logs = []
+        for pod in pods:
+            pod_name = pod.metadata.name
+            try:
+                logs = self.get_pod_logs(pod_name, tail_lines=tail_lines)
+                if logs:
+                    all_logs.append(f"=== Pod: {pod_name} ===\n{logs}")
+            except Exception as e:
+                logger.warning(f"Could not get logs from pod {pod_name}: {e}")
+
+        return "\n".join(all_logs)
+
+    def get_taskmanager_logs(self, deployment_name: str, tail_lines: int = 1000) -> str:
+        """
+        Get logs from TaskManager pods for a FlinkDeployment.
+
+        Args:
+            deployment_name: Name of the FlinkDeployment
+            tail_lines: Number of lines to retrieve
+
+        Returns:
+            Combined TaskManager logs
+        """
+        # Try component=taskmanager label first
+        logs = self.get_pod_logs_by_label(
+            f"app={deployment_name},component=taskmanager",
+            tail_lines=tail_lines
+        )
+
+        if not logs:
+            # Fallback: find pods with taskmanager in name
+            all_pods = self.list_pods(label_selector=f"app={deployment_name}")
+            tm_pods = [p for p in all_pods if 'taskmanager' in p.metadata.name]
+            if tm_pods:
+                all_logs = []
+                for pod in tm_pods:
+                    pod_logs = self.get_pod_logs(pod.metadata.name, tail_lines=tail_lines)
+                    if pod_logs:
+                        all_logs.append(f"=== Pod: {pod.metadata.name} ===\n{pod_logs}")
+                logs = "\n".join(all_logs)
+
+        return logs

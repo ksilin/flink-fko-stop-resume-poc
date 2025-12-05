@@ -1,0 +1,76 @@
+apiVersion: flink.apache.org/v1beta1
+kind: FlinkDeployment
+metadata:
+  name: stateful-job-laststate
+  namespace: flink
+spec:
+  image: flink-deployment-test:latest
+  imagePullPolicy: Never
+  flinkVersion: v1_20
+  flinkConfiguration:
+    taskmanager.numberOfTaskSlots: "2"
+    state.backend: filesystem
+    state.checkpoints.dir: file:///opt/flink/checkpoints
+    state.savepoints.dir: file:///opt/flink/savepoints
+    execution.checkpointing.interval: 10s
+    # Enable HA for last-state recovery
+    high-availability: org.apache.flink.kubernetes.highavailability.KubernetesHaServicesFactory
+    high-availability.storageDir: file:///opt/flink/ha
+  serviceAccount: flink
+  jobManager:
+    resource:
+      memory: "1024m"
+      cpu: 1
+    podTemplate:
+      spec:
+        containers:
+          - name: flink-main-container
+            volumeMounts:
+              - name: savepoints-volume
+                mountPath: /opt/flink/savepoints
+              - name: checkpoints-volume
+                mountPath: /opt/flink/checkpoints
+              - name: ha-volume
+                mountPath: /opt/flink/ha
+        volumes:
+          - name: savepoints-volume
+            persistentVolumeClaim:
+              claimName: flink-savepoints-pvc
+          - name: checkpoints-volume
+            persistentVolumeClaim:
+              claimName: flink-checkpoints-pvc
+          - name: ha-volume
+            persistentVolumeClaim:
+              claimName: flink-checkpoints-pvc
+  taskManager:
+    resource:
+      memory: "1024m"
+      cpu: 1
+    podTemplate:
+      spec:
+        containers:
+          - name: flink-main-container
+            volumeMounts:
+              - name: savepoints-volume
+                mountPath: /opt/flink/savepoints
+              - name: checkpoints-volume
+                mountPath: /opt/flink/checkpoints
+              - name: ha-volume
+                mountPath: /opt/flink/ha
+        volumes:
+          - name: savepoints-volume
+            persistentVolumeClaim:
+              claimName: flink-savepoints-pvc
+          - name: checkpoints-volume
+            persistentVolumeClaim:
+              claimName: flink-checkpoints-pvc
+          - name: ha-volume
+            persistentVolumeClaim:
+              claimName: flink-checkpoints-pvc
+  job:
+    jarURI: local:///opt/flink/usrlib/flink-deployment-test-1.0-SNAPSHOT.jar
+    entryClass: com.example.flink.StatefulJob
+    args: []
+    parallelism: 2
+    upgradeMode: last-state
+    state: running

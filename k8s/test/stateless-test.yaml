@@ -1,0 +1,27 @@
+apiVersion: flink.apache.org/v1beta1
+kind: FlinkDeployment
+metadata:
+  name: stateless-test
+  namespace: flink
+spec:
+  image: flink-deployment-test:latest
+  imagePullPolicy: Never
+  flinkVersion: v1_20
+  flinkConfiguration:
+    taskmanager.numberOfTaskSlots: "1"
+  serviceAccount: flink
+  jobManager:
+    resource:
+      memory: "1024m"
+      cpu: 0.25
+  taskManager:
+    resource:
+      memory: "1024m"
+      cpu: 0.25
+  job:
+    jarURI: local:///opt/flink/usrlib/flink-deployment-test-1.0-SNAPSHOT.jar
+    entryClass: com.example.flink.StatelessJob
+    args: ["--watermarks=false"]
+    parallelism: 1
+    upgradeMode: stateless
+    state: running
